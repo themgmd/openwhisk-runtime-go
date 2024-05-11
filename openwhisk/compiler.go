@@ -18,6 +18,7 @@
 package openwhisk
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -43,10 +44,10 @@ func isCompiled(file string) bool {
 	return IsExecutable(buf, runtime.GOOS)
 }
 
-// CompileAction will compile an anction in source format invoking a compiler
+// CompileAction will compile an action in source format invoking a compiler
 func (ap *ActionProxy) CompileAction(main string, srcDir string, binDir string) error {
 	if ap.compiler == "" {
-		return fmt.Errorf("No compiler defined")
+		return errors.New("no compiler defined")
 	}
 
 	Debug("compiling: %s %s %s %s", ap.compiler, main, srcDir, binDir)

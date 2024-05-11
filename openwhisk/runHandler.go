@@ -18,12 +18,20 @@
 package openwhisk
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 )
+
+type Json map[string]interface{}
+
+type Args struct {
+	Headers *http.Header
+	Body    Json
+	Query   *url.Values
+	Params  Json
+}
 
 // ErrResponse is the response when there are errors
 type ErrResponse struct {
@@ -44,15 +52,19 @@ func sendError(w http.ResponseWriter, code int, cause string) {
 }
 
 func (ap *ActionProxy) runHandler(w http.ResponseWriter, r *http.Request) {
+	var args Args
 
-	// parse the request
-	body, err := ioutil.ReadAll(r.Body)
+	*args.Query = r.URL.Query()
+	*args.Headers = r.Header
+
 	defer r.Body.Close()
+	// parse the request
+	err := json.NewDecoder(r.Body).Decode(&args.Body)
 	if err != nil {
 		sendError(w, http.StatusBadRequest, fmt.Sprintf("Error reading request body: %v", err))
 		return
 	}
-	Debug("done reading %d bytes", len(body))
+	Debug("done reading x bytes")
 
 	// check if you have an action
 	if ap.theExecutor == nil {
@@ -66,11 +78,14 @@ func (ap *ActionProxy) runHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// remove newlines
-	body = bytes.Replace(body, []byte("\n"), []byte(""), -1)
+	body, err := json.Marshal(args)
+	if err != nil {
+		sendError(w, http.StatusBadRequest, fmt.Sprintf("Error marshal custom args: %v", err))
+		return
+	}
 
 	// execute the action
 	response, err := ap.theExecutor.Interact(body)
-
 	// check for early termination
 	if err != nil {
 		Debug("WARNING! Command exited")
